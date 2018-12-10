@@ -89,10 +89,17 @@ void BaseRealSenseNode::toggleSensors(bool enabled)
     for (auto it=_sensors.begin(); it != _sensors.end(); it++)
     {
         auto& sens = _sensors[it->first];
-        if (enabled)
-            sens.start(_syncer);
-        else
-            sens.stop();
+        try
+        {
+            if (enabled)
+                sens.start(_syncer);
+            else
+                sens.stop();
+        }
+        catch(const rs2::wrong_api_call_sequence_error& ex)
+        {
+            ROS_DEBUG_STREAM("toggleSensors: " << ex.what());
+        }
     }
 }
 
@@ -436,7 +443,7 @@ void BaseRealSenseNode::publishAlignedDepthToOthers(rs2::frameset frames, const 
                          _depth_aligned_info_publisher,
                          _depth_aligned_image_publishers, _depth_aligned_seq,
                          _depth_aligned_camera_info, _optical_frame_id,
-                         _depth_aligned_encoding, true);
+                         _depth_aligned_encoding);
         }
     }
 }
@@ -472,7 +479,7 @@ void BaseRealSenseNode::enable_devices()
 
 						_enabled_profiles[elem].push_back(profile);
 
-						_image[elem] = cv::Mat(_width[elem], _height[elem], _image_format[elem], cv::Scalar(0, 0, 0));
+						_image[elem] = cv::Mat(_height[elem], _width[elem], _image_format[elem], cv::Scalar(0, 0, 0));
 
 						ROS_INFO_STREAM(_stream_name[elem] << " stream is enabled - width: " << _width[elem] << ", height: " << _height[elem] << ", fps: " << _fps[elem]);
 						break;
@@ -496,7 +503,7 @@ void BaseRealSenseNode::enable_devices()
 	{
 		for (auto& profiles : _enabled_profiles)
 		{
-			_depth_aligned_image[profiles.first] = cv::Mat(_width[DEPTH], _height[DEPTH], _image_format[DEPTH], cv::Scalar(0, 0, 0));
+			_depth_aligned_image[profiles.first] = cv::Mat(_height[DEPTH], _width[DEPTH], _image_format[DEPTH], cv::Scalar(0, 0, 0));
 		}
 	}
 }
@@ -505,22 +512,17 @@ void BaseRealSenseNode::setupFilters()
 {
     std::vector<std::string> filters_str;
     boost::split(filters_str, _filters_str, [](char c){return c == ',';});
+    bool use_disparity_filter(false);
+    bool use_colorizer_filter(false);
     for (std::vector<std::string>::const_iterator s_iter=filters_str.begin(); s_iter!=filters_str.end(); s_iter++)
     {
         if ((*s_iter) == "colorizer")
         {
-            ROS_INFO("Add Filter: colorizer");
-            _filters.push_back(NamedFilter("colorizer", std::make_shared<rs2::colorizer>()));
-
-            // Types for depth stream
-            _format[DEPTH] = _format[COLOR];   // libRS type
-            _image_format[DEPTH] = _image_format[COLOR];    // CVBridge type
-            _encoding[DEPTH] = _encoding[COLOR]; // ROS message type
-            _unit_step_size[DEPTH] = _unit_step_size[COLOR]; // sensor_msgs::ImagePtr row step size
-
-            _width[DEPTH] = _width[COLOR];
-            _height[DEPTH] = _height[COLOR];
-            _image[DEPTH] = cv::Mat(_width[DEPTH], _height[DEPTH], _image_format[DEPTH], cv::Scalar(0, 0, 0));
+            use_colorizer_filter = true;
+        }
+        else if ((*s_iter) == "disparity")
+        {
+            use_disparity_filter = true;
         }
         else if ((*s_iter) == "spatial")
         {
@@ -532,6 +534,11 @@ void BaseRealSenseNode::setupFilters()
             ROS_INFO("Add Filter: temporal");
             _filters.push_back(NamedFilter("temporal", std::make_shared<rs2::temporal_filter>()));
         }
+        else if ((*s_iter) == "decimation")
+        {
+            ROS_INFO("Add Filter: decimation");
+            _filters.push_back(NamedFilter("decimation", std::make_shared<rs2::decimation_filter>()));
+        }
         else if ((*s_iter) == "pointcloud")
         {
             assert(_pointcloud); // For now, it is set in getParameters()..
@@ -541,6 +548,28 @@ void BaseRealSenseNode::setupFilters()
             ROS_ERROR_STREAM("Unknown Filter: " << (*s_iter));
             throw;
         }
+    }
+    if (use_disparity_filter)
+    {
+        ROS_INFO("Add Filter: disparity");
+        _filters.insert(_filters.begin(), NamedFilter("disparity_start", std::make_shared<rs2::disparity_transform>()));
+        _filters.push_back(NamedFilter("disparity_end", std::make_shared<rs2::disparity_transform>(false)));
+        ROS_INFO("Done Add Filter: disparity");
+    }
+    if (use_colorizer_filter)
+    {
+        ROS_INFO("Add Filter: colorizer");
+        _filters.push_back(NamedFilter("colorizer", std::make_shared<rs2::colorizer>()));
+
+        // Types for depth stream
+        _format[DEPTH] = _format[COLOR];   // libRS type
+        _image_format[DEPTH] = _image_format[COLOR];    // CVBridge type
+        _encoding[DEPTH] = _encoding[COLOR]; // ROS message type
+        _unit_step_size[DEPTH] = _unit_step_size[COLOR]; // sensor_msgs::ImagePtr row step size
+
+        _width[DEPTH] = _width[COLOR];
+        _height[DEPTH] = _height[COLOR];
+        _image[DEPTH] = cv::Mat(_height[DEPTH], _width[DEPTH], _image_format[DEPTH], cv::Scalar(0, 0, 0));
     }
     if (_pointcloud)
     {
@@ -1313,10 +1342,26 @@ void BaseRealSenseNode::publishFrame(rs2::frame f, const ros::Time& t,
                                      bool copy_data_from_frame)
 {
     ROS_DEBUG("publishFrame(...)");
+    auto width = 0;
+    auto height = 0;
+    auto bpp = 1;
+    if (f.is<rs2::video_frame>())
+    {
+        auto image = f.as<rs2::video_frame>();
+        width = image.get_width();
+        height = image.get_height();
+        bpp = image.get_bytes_per_pixel();
+    }
     auto& image = images[stream];
 
     if (copy_data_from_frame)
+    {
+        if (images[stream].size() != cv::Size(width, height))
+        {
+            image.create(height, width, _image_format[stream]);
+        }
         image.data = (uint8_t*)f.get_data();
+    }
 
     ++(seq[stream]);
     auto& info_publisher = info_publishers.at(stream);
@@ -1324,17 +1369,6 @@ void BaseRealSenseNode::publishFrame(rs2::frame f, const ros::Time& t,
     if(0 != info_publisher.getNumSubscribers() ||
        0 != image_publisher.first.getNumSubscribers())
     {
-        auto width = 0;
-        auto height = 0;
-        auto bpp = 1;
-        if (f.is<rs2::video_frame>())
-        {
-            auto image = f.as<rs2::video_frame>();
-            width = image.get_width();
-            height = image.get_height();
-            bpp = image.get_bytes_per_pixel();
-        }
-
         sensor_msgs::ImagePtr img;
         img = cv_bridge::CvImage(std_msgs::Header(), encoding.at(stream), image).toImageMsg();
         img->width = width;
@@ -1388,7 +1422,14 @@ void BaseD400Node::callback(base_d400_paramsConfig &config, uint32_t level)
         for (int i = 1 ; i < base_depth_count ; ++i)
         {
             ROS_DEBUG_STREAM("base_depth_param = " << i);
-            setParam(config ,(base_depth_param)i);
+            try
+            {
+                setParam(config ,(base_depth_param)i);
+            }
+            catch(...)
+            {
+                ROS_ERROR_STREAM("Failed. Skip initialization of parameter " << (base_depth_param)i);
+            }
         }
     }
     else
@@ -1494,8 +1535,7 @@ void BaseD400Node::setParam(base_d400_paramsConfig &config, base_depth_param par
         }
         break;
     }
-    default:
-        ROS_WARN_STREAM("Unrecognized D400 param (" << param << ")");
+    case base_depth_count:
         break;
     }
 }

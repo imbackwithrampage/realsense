@@ -17,7 +17,6 @@ namespace realsense2_camera
 {
     enum base_depth_param{
         base_depth_gain = 1,
-        base_depth_enable_auto_exposure,
         base_depth_visual_preset,
         base_depth_frames_queue_size,
         base_depth_error_polling_enabled,
@@ -25,6 +24,7 @@ namespace realsense2_camera
         base_depth_units,
         base_sensors_enabled,
         base_JSON_file_path,
+        base_depth_enable_auto_exposure = 100,
         base_depth_count
     };
 
@@ -54,12 +54,19 @@ namespace realsense2_camera
 
     class NamedFilter
     {
-        public:
-            std::string _name;
-            std::shared_ptr<rs2::processing_block> _filter;
+        private:
+#if RS2_API_VERSION >= 21700
+            typedef rs2::filter RS2_FilterType;
+#else  // RS2_API_VERSION
+            typedef rs2::processing_block RS2_FilterType;
+#endif // RS2_API_VERSION
 
         public:
-            NamedFilter(std::string name, std::shared_ptr<rs2::processing_block> filter):
+            std::string _name;
+            std::shared_ptr<RS2_FilterType> _filter;
+
+        public:
+            NamedFilter(std::string name, std::shared_ptr<RS2_FilterType> filter):
             _name(name), _filter(filter)
             {}
     };
