@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
     message_generation
     nav_msgs
     roscpp
+    rosunit
     sensor_msgs
     std_msgs
     nodelet
@@ -54,6 +55,12 @@ add_message_files(
     Extrinsics.msg
     )
 
+add_service_files(
+    FILES
+    PixelToPoint.srv
+    PointToPixel.srv
+    )
+
 generate_messages(
     DEPENDENCIES
     sensor_msgs
@@ -85,6 +92,7 @@ add_library(${PROJECT_NAME}
     src/realsense_node_factory.cpp
     src/base_realsense_node.cpp
     src/t265_realsense_node.cpp
+    src/RealsensePixelPointConversionService.cc
     )
 
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_generate_messages_cpp)
@@ -136,3 +144,12 @@ install(DIRECTORY urdf/
 install(DIRECTORY meshes/
     DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/meshes
     )
+
+#############
+## Testing ##
+#############
+
+if(CATKIN_ENABLE_TESTING)
+    find_package(rostest REQUIRED)
+    add_subdirectory(test)
+endif()

@@ -85,7 +85,9 @@ BaseRealSenseNode::BaseRealSenseNode(ros::NodeHandle& nodeHandle,
     _pnh(privateNodeHandle), _dev(dev), _json_file_path(""),
     _serial_no(serial_no),
     _is_initialized_time_base(false),
-    _namespace(getNamespaceStr())
+    _namespace(getNamespaceStr()),
+    _point_conversion_service(nullptr)
+
 {
     // Types for depth stream
     _image_format[RS2_STREAM_DEPTH] = CV_16UC1;    // CVBridge type
@@ -1617,8 +1619,19 @@ void BaseRealSenseNode::setupStreams()
     }
 }
 
+void BaseRealSenseNode::enablePixelPointConversionService(const rs2::video_stream_profile& profile)
+{
+    if(profile.stream_type() == RS2_STREAM_COLOR)
+    {
+        const auto intrinsics = profile.get_intrinsics();
+        _point_conversion_service.reset(new RealsensePixelPointConversionService(_pnh, intrinsics));
+    }
+}
+
 void BaseRealSenseNode::updateStreamCalibData(const rs2::video_stream_profile& video_profile)
 {
+    enablePixelPointConversionService(video_profile);
+
     stream_index_pair stream_index{video_profile.stream_type(), video_profile.stream_index()};
     auto intrinsic = video_profile.get_intrinsics();
     _stream_intrinsics[stream_index] = intrinsic;
