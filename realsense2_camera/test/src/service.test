@@ -1,0 +1,18 @@
+<launch>
+  <!-- Include a realsense profile -->
+  <arg name="manager"             default="realsense_manager"/>
+  
+  <!-- Common nodelet manager -->
+  <node pkg="nodelet" type="nodelet" name="$(arg manager)" args="manager" output="screen"/>
+
+  <include
+    file="$(find realsense2_camera)/test/src/realsense_test.xml">
+    <arg name="mgr" value="$(arg manager)"/>
+  </include>
+
+	<test
+    test-name="Realsense pixel point conversion service test" pkg="realsense2_camera"
+    type="realsense_pixel_conversion_service_test"
+    name="RealsensePixelPointConversionServiceTestNode">
+	</test>
+</launch>
