@@ -1,6 +1,6 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RealsensePixelPointConversionService.h"
+#include "realsense_pixel_point_conversion_service.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
