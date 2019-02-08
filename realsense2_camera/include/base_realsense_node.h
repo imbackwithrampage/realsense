@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "realsense_pixel_point_conversion_service.h"
 #include "../include/realsense_node_factory.h"
 #include "RealsensePixelPointConversionService.h"
 #include <ddynamic_reconfigure/ddynamic_reconfigure.h>
