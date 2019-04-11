@@ -92,7 +92,6 @@ add_library(${PROJECT_NAME}
     src/realsense_node_factory.cpp
     src/base_realsense_node.cpp
     src/t265_realsense_node.cpp
-    src/RealsensePixelPointConversionService.cc
     src/realsense_pixel_point_conversion_service.cc
     )
 
