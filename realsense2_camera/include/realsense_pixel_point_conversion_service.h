@@ -14,8 +14,8 @@
 #include <realsense2_camera/PointToPixel.h>
 
 #include <librealsense2/h/rs_types.h>
-#include <ros/ros.h>
 #include <opencv2/opencv.hpp>
+#include <ros/ros.h>
 
 #include <string>
 
@@ -76,6 +76,12 @@ private:
    */
   bool pointToPixelRos(realsense2_camera::PointToPixel::Request &request,
                        realsense2_camera::PointToPixel::Response &response);
+
+  /**
+   * @brief Print out the information contained in the rs2_intrinsics data structure.
+   * @param intrinsics Intrinsics data structure.
+   */
+  void printIntrinsics(const rs2_intrinsics &intrinsics);
 };
 
 } // namespace realsense2_camera
