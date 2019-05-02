@@ -1,0 +1,6 @@
+<launch>
+  <node name="PixelPointConversionRealsenseNode" pkg="realsense2_camera" type="realsense2_camera_pixel_point_conversion_service_node"/>
+  
+  <!-- Camera profile. Defaults to 720p colour if not specified. -->
+  <!-- <param name="pixel_point_conversion_service/profile" value="D435_1080P_ALIGNED"/> -->
+</launch>

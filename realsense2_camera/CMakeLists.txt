@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(realsense2_camera)
-add_compile_options(-std=c++11)
+add_compile_options(-std=gnu++11)
 
 option(BUILD_WITH_OPENMP "Use OpenMP" OFF)
 option(SET_USER_BREAK_AT_STARTUP "Set user wait point in startup (for debug)" OFF)
@@ -94,6 +94,15 @@ add_library(${PROJECT_NAME}
     src/t265_realsense_node.cpp
     src/realsense_pixel_point_conversion_service.cc
     )
+
+set(CONVERSION_SERVICE_NODE ${PROJECT_NAME}_pixel_point_conversion_service_node)
+add_executable(${CONVERSION_SERVICE_NODE} src/realsense_pixel_point_conversion_service.cc src/pixel_point_conversion_node.cc)
+
+target_link_libraries(${CONVERSION_SERVICE_NODE}
+    ${realsense2_LIBRARY}
+    ${catkin_LIBRARIES}
+    ${CMAKE_THREAD_LIBS_INIT}
+)
 
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_generate_messages_cpp)
 add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
